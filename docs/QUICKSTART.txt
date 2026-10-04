@@ -1,4 +1,4 @@
-MOS BINARY MANAGER 0.2.1 — PREPARED RELEASE
+MOS BINARY MANAGER 0.2.2 — PREPARED RELEASE
 
 UPDATE SAFELY
 For an existing installation, use MOS's plugin update flow after the release is published. Wait for completion and reload MOS. Do not reinstall over existing settings. This package preparation does not publish or install anything.

@@ -408,3 +408,117 @@ test('nested picker cancellation preserves runtime draft and log warning covers 
     byLabel(view.element, 'View Syncthing logs').click(); await flush(); assert.match(view.element.querySelector('dialog').textContent, /may contain secrets/);
   } finally { view.close(); }
 });
+
+// Run the production scheduled callback explicitly, without sleeping for three
+// seconds or changing its interval. Other timers retain their normal behavior.
+function capturePolling() {
+  const original = globalThis.setTimeout;
+  let poll;
+  globalThis.setTimeout = (callback, delay, ...args) => {
+    const timer = original(callback, delay, ...args);
+    if (delay === 3000) poll = () => { clearTimeout(timer); callback(...args); };
+    return timer;
+  };
+  return { run: () => { assert.ok(poll, 'A background poll must be scheduled'); const callback = poll; poll = null; callback(); }, restore: () => { globalThis.setTimeout = original; } };
+}
+
+const pollDrafts = [
+  { name: 'folder', selector: '#bm-folder', draft: '/mnt/preview-pool/unsaved-folder', open: () => {}, save: element => button(element, 'Save folder') },
+  { name: 'manual executable', selector: '#bm-manual', draft: '/opt/unsaved-executable', open: () => {}, save: element => button(element, 'Add app') },
+  { name: 'instance settings', selector: '#bm-edit-args', draft: '--unsaved\nvalue with spaces', open: element => byLabel(element, 'Edit Syncthing').click(), save: element => applySettings(element.querySelector('dialog')) },
+  { name: 'runtime defaults', selector: '#bm-storage-root', draft: '/mnt/preview-pool/unsaved-root', open: element => button(element, 'Edit runtime defaults').click(), save: element => applySettings(element.querySelector('dialog')) },
+];
+for (const scenario of pollDrafts) test(`background polling keeps ${scenario.name} editable without replacing its draft or CAS baseline`, async () => {
+  const polling = capturePolling();
+  const view = mount(createMock(runtimeFixture()));
+  let release;
+  try {
+    await flush(); scenario.open(view.element); await flush();
+    const field = view.element.querySelector(scenario.selector);
+    input(field, scenario.draft); field.focus(); field.setSelectionRange(2, 5); await flush();
+    const fields = [...field.closest('fieldset').querySelectorAll('input, textarea, select')];
+    const state = () => fields.map(node => ({ id: node.id, value: node.value, checked: node.checked }));
+    const draftState = state();
+    const assertDraft = () => {
+      // jsdom does not blur a disabled fieldset like real browsers do: effective
+      // disabled state catches the cause, while identity/focus/selection cover
+      // remounts and text replacement separately.
+      for (const node of fields) {
+        assert.equal(node.matches(':disabled'), false, `${node.id} must remain editable during status polling`);
+        assert.equal(view.element.querySelector(`#${node.id}`), node);
+      }
+      assert.deepEqual(state(), draftState);
+      assert.equal(document.activeElement, field);
+      assert.deepEqual([field.selectionStart, field.selectionEnd], [2, 5]);
+    };
+    const normalFetch = globalThis.fetch;
+    globalThis.fetch = async (...args) => { await new Promise(resolve => { release = resolve; }); return normalFetch(...args); };
+    // Check unchanged and newer snapshots, then submit during one more poll
+    // after revision 9 is loaded. None may change the draft or its CAS baseline.
+    for (const changed of [false, true, false]) {
+      polling.run(); await flush();
+      assertDraft(); assert.equal(scenario.save(view.element).disabled, true);
+      // Enter/form submission must not sneak a write past the disabled button.
+      submit(field.closest('form')); await flush();
+      assert.equal(view.mock.calls.some(call => call.action === 'save'), false);
+      if (changed) {
+        view.mock.value.config.revision = 9;
+        view.mock.value.config.folder = '/mnt/preview-pool/remote-folder';
+        view.mock.value.config.apps[0].name = 'Remote app name';
+        view.mock.value.config.apps[0].args = ['--remote'];
+        view.mock.value.config.runtimeDefaults.storageRoot = '/mnt/preview-pool/remote-root';
+      }
+      release(); release = null; await flush();
+      assertDraft(); assert.equal(scenario.save(view.element).disabled, false);
+    }
+    globalThis.fetch = normalFetch;
+    submit(field.closest('form')); await flush();
+    const saved = view.mock.calls.find(call => call.action === 'save');
+    assert.ok(saved);
+    if (scenario.name === 'manual executable') {
+      assert.equal(saved.expectedRevision, 9, 'New additions use the latest confirmed snapshot');
+      assert.equal(view.mock.value.config.apps.at(-1).path, scenario.draft);
+      assert.equal(view.mock.value.config.apps[0].name, 'Remote app name');
+      assert.equal(view.mock.value.config.folder, '/mnt/preview-pool/remote-folder');
+    } else {
+      assert.equal(saved.expectedRevision, 2, 'Existing drafts retain their original CAS revision');
+      assert.equal(view.mock.value.config.revision, 9, 'A conflict must not overwrite newer host settings');
+      assert.equal(view.element.querySelector(scenario.selector).value, scenario.draft);
+      assert.match(view.element.textContent, /Configuration changed elsewhere/);
+    }
+  } finally { if (release) release(); view.close(); polling.restore(); }
+});
+
+test('draft editability does not weaken initial load, stale status, mutation or request serialization guards', async () => {
+  const calls = []; let manager; let release; let fail = false;
+  const send = async payload => {
+    calls.push(payload);
+    await new Promise(resolve => { release = resolve; });
+    if (fail) throw new Error('Offline');
+    return runtimeFixture();
+  };
+  const element = document.createElement('main'); document.body.append(element);
+  const app = createApp({ setup() { manager = useManager(send, 100000); return () => h('div'); } }); app.mount(element);
+  try {
+    assert.equal(manager.formDisabled.value, true); assert.equal(manager.disabled.value, true);
+    release(); await flush();
+    assert.equal(manager.formDisabled.value, false); assert.equal(manager.disabled.value, false);
+    const poll = manager.refresh(false); await flush();
+    assert.equal(manager.formDisabled.value, false); assert.equal(manager.disabled.value, true);
+    assert.equal(await manager.mutate({ action: 'restart', id: 'test' }), false);
+    assert.equal(await manager.refresh(false), false); assert.deepEqual(calls.map(call => call.action), ['status', 'status']);
+    release(); await poll;
+    const mutation = manager.mutate({ action: 'restart', id: 'test' }); await flush();
+    assert.equal(manager.formDisabled.value, true); assert.equal(manager.disabled.value, true);
+    assert.equal(await manager.refresh(false), false); assert.equal(await manager.mutate({ action: 'restart', id: 'test' }), false);
+    assert.deepEqual(calls.map(call => call.action), ['status', 'status', 'restart']);
+    release(); await mutation;
+    assert.equal(manager.formDisabled.value, false); assert.equal(manager.disabled.value, false);
+    fail = true; const outage = manager.refresh(false); await flush(); release(); await outage;
+    assert.equal(manager.stale.value, true); assert.equal(manager.formDisabled.value, true); assert.equal(manager.disabled.value, true);
+    fail = false; const recovery = manager.refresh(false); await flush();
+    assert.equal(manager.formDisabled.value, true, 'Stale drafts stay disabled until status is confirmed');
+    release(); await recovery;
+    assert.equal(manager.formDisabled.value, false); assert.equal(manager.disabled.value, false);
+  } finally { release?.(); app.unmount(); element.remove(); }
+});

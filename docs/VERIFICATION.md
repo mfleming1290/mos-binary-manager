@@ -1,4 +1,25 @@
-# Verification: Binary Manager 0.2.1
+# Verification: Binary Manager 0.2.2
+
+## Polling-focus patch preparation (2026-10-04)
+
+Prepared from published 0.2.1 commit `e7deb9b3ef10b349beb4b39071df4b6727163689`; all 59 source files matched its recorded SHA-256 manifest before editing. The supplied video was visually inspected and shows the Runtime defaults storage-root field retaining its text while its focus outline disappears.
+
+The status poll previously reused the action-disabled flag on every editable fieldset. The fix separates draft-field editability from action availability: healthy background reads leave the fields enabled, while writes and process actions remain blocked until that read completes. Initial load, stale state, active mutations and failed revision checks keep their existing guards. A folder-submit early return prevents Enter during a poll from accidentally rebasing an unsaved folder draft.
+
+- All 57 frontend API/model/component tests pass, including five new regressions
+- The four new editing-flow tests fail against unmodified 0.2.1 at the effective-disabled assertion, then pass with this patch
+- Tests cover all four editable fieldsets, unchanged and newer snapshots, another poll after the newer revision arrives, DOM identity, focus/selection, dirty draft preservation, keyboard submission and original-revision conflict handling
+- A separate manager test covers initial/stale loading guards, mutation disabling, polling/writing mutual exclusion and recovery
+- Production federation build and all 17 source/package/transport/release tests pass
+- Both amd64 and arm64 Debian packages are built and independently inspected for static ELF architecture, version, exact web/documentation bytes, modes/ownership and MD5/SHA-256; the packaged amd64 launch-gate fixture passes
+- Go formatting and vet pass; the full backend race run records 41 passing top-level tests, seven environment-blocked Unix-socket tests and one skipped root-only fixture. Backend production and test sources are unchanged by this patch
+- Independent review found no blocking issue; its extra post-revision polling/CAS regression suggestion was incorporated
+
+The local browser refuses the preview URL with `ERR_BLOCKED_BY_CLIENT`. The DOM tests check effective disabled state because jsdom does not reproduce the browser blur caused by a disabled fieldset; they do not establish actual MOS-browser behavior. Unix-socket tests report `socket: operation not permitted`, and the root-owned protected-file test cannot run under this non-root executor. No access controls or tests were weakened to bypass these limits.
+
+Before publishing, require green main CI on the exact final source commit, then green numeric-tag CI including the complete race/socket suite and mandatory root-owned fixture, and verify all seven release assets. Actual MOS update/authentication, browser focus across repeated polls, reboot and native arm64 execution remain host-verification steps. No NAS settings, data, permissions or services were changed by this preparation.
+
+# Historical verification: Binary Manager 0.2.1
 
 ## Storage-check patch preparation (2026-10-04)
 

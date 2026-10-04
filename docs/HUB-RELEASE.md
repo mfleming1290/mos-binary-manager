@@ -37,18 +37,18 @@ Do not commit `node_modules`, `page/dist`, `artifacts`, `checksums`, preview out
 
 MOS downloads the tag's source separately to read `page/plugin.config.js`, `functions` and `settings.json`. Attaching only a Debian package does not satisfy this contract.
 
-## 2. Build and release numeric tag 0.2.1
+## 2. Build and release numeric tag 0.2.2
 
-Commit the source, then create and push tag `0.2.1` on that exact reviewed commit. The workflow starts automatically for numeric tags. In an already configured local checkout:
+Commit the source, then create and push tag `0.2.2` on that exact reviewed commit. The workflow starts automatically for numeric tags. In an already configured local checkout:
 
 ```bash
-git tag 0.2.1
-git push origin 0.2.1
+git tag 0.2.2
+git push origin 0.2.2
 ```
 
 Pushing `main` or opening a pull request runs build/tests without publishing. GitHub Actions → **Build and Release** → **Run workflow** can retry a numeric tag that already exists; it deliberately does not invent a tag on a different/default-branch commit. For the first run, push the tag as above. The workflow must also exist on the default branch for the manual button to appear.
 
-The committed version in `page/plugin.config.js`, `page/package.json`, and both root version entries of `page/package-lock.json` must all equal the tag. Use `0.2.1`, never `v0.2.1`. The workflow fails instead of changing these files only inside CI, because MOS reads the original tagged source. Update `docs/RELEASE-NOTES.md` for every release as well.
+The committed version in `page/plugin.config.js`, `page/package.json`, and both root version entries of `page/package-lock.json` must all equal the tag. Use `0.2.2`, never `v0.2.2`. The workflow fails instead of changing these files only inside CI, because MOS reads the original tagged source. Update `docs/RELEASE-NOTES.md` for every release as well.
 
 The workflow uses GitHub-hosted Ubuntu, Node 22, Go 1.27.1, `npm ci` with the committed lockfile, and no external publish token. Build jobs have read access; only the release job has `contents: write`. Repository/organization policy must permit that workflow permission. Do not create a personal token just for this workflow.
 
@@ -64,13 +64,13 @@ It creates a draft with all assets and only then publishes it. It refuses an exi
 Expected release assets:
 
 ```text
-binary-manager_0.2.1-1+mos-plugin_amd64.deb
-binary-manager_0.2.1-1+mos-plugin_amd64.deb.md5
-binary-manager_0.2.1-1+mos-plugin_amd64.deb.sha256
-binary-manager_0.2.1-1+mos-plugin_arm64.deb
-binary-manager_0.2.1-1+mos-plugin_arm64.deb.md5
-binary-manager_0.2.1-1+mos-plugin_arm64.deb.sha256
-mos-binary-manager-0.2.1-source.zip
+binary-manager_0.2.2-1+mos-plugin_amd64.deb
+binary-manager_0.2.2-1+mos-plugin_amd64.deb.md5
+binary-manager_0.2.2-1+mos-plugin_amd64.deb.sha256
+binary-manager_0.2.2-1+mos-plugin_arm64.deb
+binary-manager_0.2.2-1+mos-plugin_arm64.deb.md5
+binary-manager_0.2.2-1+mos-plugin_arm64.deb.sha256
+mos-binary-manager-0.2.2-source.zip
 ```
 
 GitHub also provides its automatic source ZIP/tarball. MOS uses that tagged source and the one `.deb` matching the NAS architecture. Two architectures in the same release are supported; multiple `.deb` files for one architecture are not. `all` is inappropriate because the supervisor is native code. MOS reads the first hash from the matching `.deb.md5`; SHA-256 is additionally supplied for manual verification.

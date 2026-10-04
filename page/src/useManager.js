@@ -11,7 +11,10 @@ export function useManager(send = request, interval = 3000) {
   const notice = ref('');
   const lastUpdated = ref(null);
   const loaded = computed(() => snapshot.value !== null);
-  const disabled = computed(() => !loaded.value || stale.value || syncing.value || mutating.value);
+  // Background status reads must not disable focused draft fields. Actions
+  // still wait for the read to finish so requests remain serialized.
+  const formDisabled = computed(() => !loaded.value || stale.value || mutating.value);
+  const disabled = computed(() => formDisabled.value || syncing.value);
   const controller = new AbortController();
   let live = true;
   let timer;
@@ -81,5 +84,5 @@ export function useManager(send = request, interval = 3000) {
   }
   onMounted(() => refresh());
   onUnmounted(() => { live = false; clearTimeout(timer); controller.abort(); });
-  return { snapshot, syncing, mutating, stale, error, notice, lastUpdated, loaded, disabled, refresh, mutate };
+  return { snapshot, syncing, mutating, stale, error, notice, lastUpdated, loaded, formDisabled, disabled, refresh, mutate };
 }

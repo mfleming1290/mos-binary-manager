@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Existing numeric tag to build and release (for example 0.2.1)'
+        description: 'Existing numeric tag to build and release (for example 0.2.2)'
         required: true
-        default: '0.2.1'
+        default: '0.2.2'
         type: string
 
 permissions:

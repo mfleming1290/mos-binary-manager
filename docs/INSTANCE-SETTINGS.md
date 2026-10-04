@@ -1,6 +1,6 @@
 # Persistent instance settings
 
-Binary Manager 0.2.1 keeps existing entries unchanged until you enable runtime settings in their editor. There is no automatic relocation of `/root`, dotfiles, API credentials or application state.
+Binary Manager 0.2.2 keeps existing entries unchanged until you enable runtime settings in their editor. There is no automatic relocation of `/root`, dotfiles, API credentials or application state.
 
 ## Choose persistent storage first
 
