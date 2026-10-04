@@ -1,0 +1,14 @@
+{
+  "name": "Binary Manager",
+  "description": "Discover trusted foreground executables, keep selected programs running, and control their MOS boot startup.",
+  "category": ["Utilities"],
+  "repository": "https://github.com/mfleming1290/mos-binary-manager",
+  "architecture": ["amd64", "arm64"],
+  "driver": false,
+  "settings": true,
+  "icon": "https://raw.githubusercontent.com/mfleming1290/mos-hub/main/images/binary-managerIcon.svg",
+  "readme_url": "https://github.com/mfleming1290/mos-binary-manager",
+  "author": "mfleming1290",
+  "homepage": "https://github.com/mfleming1290/mos-binary-manager",
+  "support": "https://github.com/mfleming1290/mos-binary-manager/issues"
+}

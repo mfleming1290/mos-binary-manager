@@ -1,0 +1,17 @@
+MOS BINARY MANAGER 0.1.0 — HUB TEST RELEASE PREPARATION
+
+THE TWO PARTS
+1. Plugin source goes in the confirmed mfleming1290/mos-binary-manager repository, including the hidden .github/workflows/build-plugin.yml file.
+2. hub/plugins/binary-manager.json and hub/images/binary-managerIcon.svg go in the corresponding plugins/ and images/ folders of mfleming1290/mos-hub.
+
+Publish the tested GitHub release first, then add/refresh the Hub entry. The supplied files do not mean either remote change has happened. See docs/HUB-RELEASE.md for exact steps and version rules.
+
+INSTALL AFTER PUBLICATION
+In MOS Hub, refresh your configured repository, find Binary Manager under Utilities, and install release 0.1.0. MOS chooses the amd64 or arm64 package. Wait for completion, reload MOS, and open Plugins → Binary Manager. No local install script is needed.
+
+FIRST CHECK
+Select a folder or browse for an executable. Adding does not start it. Switch Keep running on explicitly. Start on boot is separate. Programs run as root in standard MOS; use trusted foreground programs only. Errors restart with 1–30 second backoff; a clean exit stays stopped.
+
+Start with tests/fixtures/loop.sh, fail.sh and exit-clean.sh on executable pool storage. Check stop, logs, failure restart, clean exit and reboot. Turn off the failure fixture when done. Actual MOS installation, upgrades and reboot are not yet verified.
+
+Existing local-test install? Back up its settings and resolve migration before using Hub. Do not reinstall over it or delete its settings. Hub's initial install and its plugin update are different paths.

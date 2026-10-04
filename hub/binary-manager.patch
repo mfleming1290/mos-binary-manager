@@ -1,0 +1,41 @@
+--- /dev/null
++++ b/plugins/binary-manager.json
+@@ -0,0 +1,14 @@
++{
++  "name": "Binary Manager",
++  "description": "Discover trusted foreground executables, keep selected programs running, and control their MOS boot startup.",
++  "category": ["Utilities"],
++  "repository": "https://github.com/mfleming1290/mos-binary-manager",
++  "architecture": ["amd64", "arm64"],
++  "driver": false,
++  "settings": true,
++  "icon": "https://raw.githubusercontent.com/mfleming1290/mos-hub/main/images/binary-managerIcon.svg",
++  "readme_url": "https://github.com/mfleming1290/mos-binary-manager",
++  "author": "mfleming1290",
++  "homepage": "https://github.com/mfleming1290/mos-binary-manager",
++  "support": "https://github.com/mfleming1290/mos-binary-manager/issues"
++}
+--- /dev/null
++++ b/images/binary-managerIcon.svg
+@@ -0,0 +1,11 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
++  <title id="title">Binary Manager</title>
++  <rect x="8" y="8" width="240" height="240" rx="52" fill="#101b2c"/>
++  <rect x="40" y="53" width="176" height="150" rx="19" fill="#1b2e46" stroke="#6389af" stroke-width="6"/>
++  <path d="M43 88h170" stroke="#6389af" stroke-width="6"/>
++  <circle cx="62" cy="71" r="5" fill="#7ff0cf"/>
++  <circle cx="81" cy="71" r="5" fill="#6389af"/>
++  <path d="m68 115 27 23-27 23m47 0h31" fill="none" stroke="#7ff0cf" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
++  <circle cx="188" cy="190" r="38" fill="#7ff0cf" stroke="#101b2c" stroke-width="7"/>
++  <path d="m180 173 24 17-24 17z" fill="#101b2c"/>
++</svg>
+--- a/MANIFEST.txt
++++ b/MANIFEST.txt
+@@ -10,4 +10,6 @@
+ plugins/goshs.json                 GoSHS file server plugin
+ images/goshsIcon.png               GoSHS plugin icon
+ plugins/kubernetes.json             Kubernetes (k3s) server/agent plugin
+-images/kubernetesIcon.png           Kubernetes plugin icon
++images/kubernetesIcon.png           Kubernetes plugin icon
++plugins/binary-manager.json         Binary Manager plugin
++images/binary-managerIcon.svg       Binary Manager plugin icon

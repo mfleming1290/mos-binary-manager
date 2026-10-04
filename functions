@@ -1,0 +1,15 @@
+#!/bin/bash
+# MOS sources this file: no top-level side effects.
+# MOS restores the .deb early; applications start only in its late boot phase.
+install() {
+  /usr/bin/plugins/binary-manager ensure
+}
+mos_start_after_services() {
+  /usr/bin/plugins/binary-manager boot
+}
+plugin_update() {
+  /usr/bin/plugins/binary-manager ensure
+}
+uninstall() {
+  /usr/bin/plugins/binary-manager shutdown --clear
+}

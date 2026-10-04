@@ -1,0 +1,9 @@
+page/node_modules/
+page/dist/
+artifacts/
+backend/binary-manager
+backend/*.test
+**/__pycache__/
+page/preview-dist/
+checksums/
+tests/review_findings.md
