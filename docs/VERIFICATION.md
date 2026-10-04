@@ -1,4 +1,12 @@
-# Verification: Binary Manager 0.1.0
+# Verification: Binary Manager 0.1.1
+
+## 0.1.1 patch
+
+The frontend fix was independently reviewed and passed all 30 frontend API/model/component tests plus the production federation build before release preparation. Coverage includes the native UUID path, a secure UUID v4 fallback, missing secure randomness, and both add flows with `randomUUID` unavailable. Actual MOS-browser testing remains unverified.
+
+The release workflow must pass its complete backend race/socket suite, frontend tests and dual-architecture package checks on the exact 0.1.1 commit before publication.
+
+## Historical 0.1.0 preparation record
 
 This is a **test build**, compiled and checked in a cloud Linux workspace. It has not been installed on a MOS NAS.
 

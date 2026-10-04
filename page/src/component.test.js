@@ -59,6 +59,32 @@ test('adding a discovered executable saves it inert and only an explicit switch 
     assert.equal(view.mock.value.config.apps.at(-1).autostart, false);
   } finally { view.close(); }
 });
+for (const source of ['manual', 'discovered']) test(`adding a ${source} executable works without the secure-context-only randomUUID API`, async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis.crypto, 'randomUUID');
+  Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: undefined });
+  const view = mount();
+  try {
+    await flush();
+    if (source === 'manual') {
+      input(view.element.querySelector('#bm-manual'), '/mnt/user/binaries/gomcp');
+      submit(view.element.querySelector('#bm-manual').closest('form'));
+    } else byLabel(view.element, 'Add filebrowser').click();
+    await flush();
+    const save = view.mock.calls.find(call => call.action === 'save');
+    assert.ok(save, 'Adding must reach the host save request without randomUUID');
+    const added = save.config.apps.at(-1);
+    assert.match(added.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.equal(added.path, source === 'manual' ? '/mnt/user/binaries/gomcp' : '/mnt/user/applications/filebrowser');
+    assert.equal(added.autostart, false);
+    assert.equal(byLabel(view.element, `Keep ${added.name} running`).checked, false);
+    assert.equal(view.mock.calls.some(call => call.action === 'toggle'), false);
+    assert.equal(view.element.querySelector('[role="alert"]'), null);
+  } finally {
+    view.close();
+    if (descriptor) Object.defineProperty(globalThis.crypto, 'randomUUID', descriptor);
+    else delete globalThis.crypto.randomUUID;
+  }
+});
 test('boot preference is independent and failed checkboxes immediately roll back', async () => {
   const view = mount();
   try {

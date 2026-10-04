@@ -1,14 +1,11 @@
-# Binary Manager 0.1.0
+# Binary Manager 0.1.1
 
-Initial MOS Hub test release for amd64 and arm64.
+Fixes adding binaries when MOS is opened through a LAN HTTP address and the browser does not expose `crypto.randomUUID`.
 
-- Browse executable files, explicitly add trusted foreground programs, and control them from the MOS plugin page
-- Independent keep-running and start-on-boot controls, restart-on-failure backoff, bounded logs and literal arguments
-- Private local supervisor with safe owned-process shutdown and persistent settings
-- Architecture-specific Debian packages, MD5 for the MOS installer and SHA-256 for manual verification
+- Generate secure UUID v4 app IDs with `crypto.getRandomValues` when `randomUUID` is unavailable
+- Keep the native `randomUUID` path when supported; no weak randomness fallback
+- Add regression coverage for both Add from Folder and Add from File flows without `randomUUID`
 
-Programs run as root on standard MOS. No application starts merely because it is discovered or added. A clean exit stays stopped.
+Upgrade an existing installation using MOS's plugin update flow, wait for completion, then reload MOS to refresh its cached plugin module. Do not reinstall over the existing installation: the update flow preserves settings.
 
-Installation, upgrade and reboot behavior still require verification on an authorized MOS test host. Native arm64 execution is not yet verified. A successful CI build does not establish these host results.
-
-Install through MOS Hub after the Binary Manager catalog entry is available. Reload MOS after installation or an update. See README.md for behavior and docs/HUB-RELEASE.md for publishing details.
+The automated frontend tests cover the reported failure and both add flows. Actual MOS-browser, upgrade, reboot and native arm64 behavior still require verification on an authorized MOS host. Programs run as root on standard MOS; adding a binary does not start it.
