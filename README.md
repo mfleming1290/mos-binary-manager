@@ -1,6 +1,6 @@
 # Binary Manager for MOS NAS
 
-Version **0.2.0**, prepared for MOS Hub distribution. Select a folder of standalone programs, add individual executable files, and supervise them without systemd.
+Version **0.2.1**, prepared for MOS Hub distribution. Select a folder of standalone programs, add individual executable files, and supervise them without systemd.
 
 ## What it does
 
@@ -46,7 +46,7 @@ This package is prepared for the supplied `mfleming1290/mos-hub` catalog, with `
 Once the GitHub release has passed the workflow and the Hub entry has been published:
 
 1. Refresh the configured MOS Hub repository and find **Binary Manager** under **Utilities**
-2. For a first installation, select numeric release **0.2.0** and install. For an existing installation, use MOS's **plugin update** flow instead. MOS selects the matching `amd64` or `arm64` package and retrieves the tag's source files itself
+2. For a first installation, select numeric release **0.2.1** and install. For an existing installation, use MOS's **plugin update** flow instead. MOS selects the matching `amd64` or `arm64` package and retrieves the tag's source files itself
 3. Wait for the MOS completion notification, reload MOS, then open **Plugins → Binary Manager**
 4. Select a binaries folder or add one executable. Explicitly turn on **Keep running** to start it. Use **Start on boot** separately
 5. Test stop, logs, an intentional failure/restart, a clean exit, and finally an actual reboot before relying on it

@@ -423,15 +423,34 @@ func persistentMount(path string, mounts []mountRecord) (mountRecord, error) {
 			return mountRecord{}, errors.New("HOME storage cannot use boot, RAM or system directories")
 		}
 	}
+	if chosen.Point == "" || chosen.Point == "/" || chosen.Device == rootDevice {
+		return mountRecord{}, errors.New("HOME storage requires a separate mounted persistent pool; refusing root-filesystem fallback")
+	}
+	// mountinfo's Root is the mounted subtree's location inside its filesystem,
+	// not its visible mount point. MOS binds pool service directories into /var
+	// and /etc; those binds must not disqualify unrelated private Btrfs siblings.
+	rel, err := filepath.Rel(chosen.Point, path)
+	if err != nil {
+		return mountRecord{}, errors.New("cannot verify HOME storage location")
+	}
+	filesystemPath := filepath.Join(chosen.Root, rel)
 	for _, m := range mounts {
 		for _, system := range []string{"/boot", "/usr", "/var", "/etc"} {
 			if pathWithin(m.Point, system) && m.Device == chosen.Device {
-				return mountRecord{}, errors.New("HOME storage cannot use a system or boot filesystem")
+				// Boot media remains excluded device-wide. Other filesystem types
+				// keep the conservative device-wide rule: their case-folding or
+				// server-side naming can make lexical subtree checks insufficient.
+				if system == "/boot" || chosen.FSType != "btrfs" || m.FSType != "btrfs" {
+					return mountRecord{}, errors.New("HOME storage cannot use a system or boot filesystem")
+				}
+				if !filepath.IsAbs(chosen.Root) || filepath.Clean(chosen.Root) != chosen.Root || !filepath.IsAbs(m.Root) || filepath.Clean(m.Root) != m.Root {
+					return mountRecord{}, errors.New("cannot verify HOME storage filesystem root")
+				}
+				if pathWithin(filesystemPath, m.Root) || pathWithin(m.Root, filesystemPath) {
+					return mountRecord{}, errors.New("HOME storage cannot overlap a system-data directory; choose a separate private directory on the pool")
+				}
 			}
 		}
-	}
-	if chosen.Point == "" || chosen.Point == "/" || chosen.Device == rootDevice {
-		return mountRecord{}, errors.New("HOME storage requires a separate mounted persistent pool; refusing root-filesystem fallback")
 	}
 	switch chosen.FSType {
 	case "ext2", "ext3", "ext4", "xfs", "btrfs", "zfs", "bcachefs", "nfs", "nfs4", "cifs":

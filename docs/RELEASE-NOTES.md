@@ -1,18 +1,13 @@
-# Binary Manager 0.2.0
+# Binary Manager 0.2.1
 
-Persistent, opt-in per-instance runtime settings and multiple instances of the same binary.
+Fixes an overly broad storage check that could reject a native Btrfs pool when MOS bind-mounts Docker, LXC or other system data from that pool.
 
-- Managed HOME directories on verified mounted pool storage, with a separate HOME for each instance ID
-- Explicit HOME and working-directory choices, additional PATH directories, ordinary environment overrides/unsets and optional XDG paths
-- Shared storage/PATH/environment defaults, applied only where the instance opts in
-- Protected environment-file references with literal parsing and private child-launch transport; file values are not placed in settings, status or command arguments
-- Duplicate configuration with a new ID, separate managed HOME, disabled boot selection and no automatic start; secret-file and XDG references are cleared
-- Applying changed settings restarts only affected enabled instances
-- Existing settings, IDs, literal arguments, boot choices, unknown fields and revision checks remain compatible; old entries are not migrated automatically
-- Retains the 0.1.1 secure UUID fallback for MOS served over LAN HTTP
+- A separate app-data directory such as `/mnt/user/binary-manager` is now accepted on a verified native Btrfs pool even when unrelated system-data directories share the filesystem
+- The backing system-data subtrees, their ancestors, descendants and bind aliases remain blocked; root and boot filesystem devices are still excluded
+- Missing-mount, no-follow, private-directory ownership/permission and protected environment-file checks remain enforced
+- Corrects the help text so `/mnt/user` is not assumed to be mergerfs; mergerfs-backed paths remain unsupported
+- Retains the per-instance settings and multiple-instance support from 0.2.0 without migrating existing settings or moving application data
 
-Use MOS's plugin update flow for an existing installation, wait for completion, and reload MOS. Do not reinstall over existing settings. Back up application data separately before changing HOME; this release does not copy old dotfiles or credentials.
+Use MOS's plugin update flow for an existing installation, wait for completion, and reload MOS. Then choose a dedicated app-data directory on the mounted Btrfs pool. Do not change ownership or permissions on the pool root or system-data folders. Changing folders in 0.2.0 alone does not fix its device-wide rejection.
 
-Programs still run as root on standard MOS. Ordinary settings are visible in the browser, and arbitrary application logs can reveal secrets. Protected environment files reduce accidental settings/argv exposure; they do not isolate root processes from one another.
-
-This source is a prepared release. Publication, physical MOS installation, actual pool/boot behavior, and native arm64 runtime verification are separate steps. See docs/VERIFICATION.md for checks completed for this build.
+Full backend race/Unix-socket tests, the mandatory root-owned protected-file test, frontend tests and both package validations are required before this tag is published. Physical MOS upgrade, real host mount behavior and native arm64 execution still need host verification; see docs/VERIFICATION.md.

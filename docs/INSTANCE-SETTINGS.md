@@ -1,12 +1,16 @@
 # Persistent instance settings
 
-Binary Manager 0.2.0 keeps existing entries unchanged until you enable runtime settings in their editor. There is no automatic relocation of `/root`, dotfiles, API credentials or application state.
+Binary Manager 0.2.1 keeps existing entries unchanged until you enable runtime settings in their editor. There is no automatic relocation of `/root`, dotfiles, API credentials or application state.
 
 ## Choose persistent storage first
 
 Open **Runtime defaults** and choose a storage root within an actual mounted MOS pool, for example a directory you administer beneath your pool's real mount. Do not copy an example path without checking your host. The manager reads the kernel mount table before creating managed HOME directories and refuses absent, RAM-backed or unsupported storage. A missing pool causes a visible start failure with the normal bounded backoff; it must not silently create application state in the RAM root filesystem.
 
 Supported HOME/XDG mounts are ext2/ext3/ext4, XFS, Btrfs, ZFS, bcachefs, NFS/NFS4 and CIFS, subject to ownership and permissions checks. Root/boot/system/RAM filesystems and mergerfs virtual pools are rejected. Use the underlying mounted persistent pool for this release; a mergerfs mount alone cannot prove its branches are safely mounted. Symlink components are not followed. The storage root and managed directories must be service-owned and mode 0700 once present; the manager creates missing directories with 0700 but does not loosen or rewrite permissions on existing paths.
+
+Choose a dedicated private subdirectory, not the pool root. A native Btrfs pool may also hold Docker, LXC or libvirt data bound into system paths: an unrelated private sibling is eligible, while those service-data directories, their ancestors and bind aliases remain excluded. A pool's name does not identify its filesystem; `/mnt/user` can be a native Btrfs pool. Other supported filesystem types retain a conservative whole-device exclusion when also mounted under system paths, because their case-folding or remote naming rules need stronger identity checks. Boot and root devices remain excluded in full.
+
+For example, if the host confirms `/mnt/user` is a mounted Btrfs pool, a new `/mnt/user/binary-manager` directory can be the managed storage root. Saving validates the path; the manager creates its private directories when an instance starts. Do not change the pool root's ownership or permissions to satisfy the managed-HOME check. If an existing chosen directory has incompatible ownership or permissions, select a new dedicated directory instead.
 
 The managed layout is `<storage-root>/<instance-id>/home`. New directories are private to the service user. An instance ID stays stable when renamed, so renaming does not change its HOME. Changing the storage root selects new homes for managed instances; it does not move existing data. Stop and back up applications before manually migrating their state, and only then apply the new root. Removing an instance does not delete its HOME or executable.
 

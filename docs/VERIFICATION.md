@@ -1,4 +1,20 @@
-# Verification: Binary Manager 0.2.0
+# Verification: Binary Manager 0.2.1
+
+## Storage-check patch preparation (2026-10-04)
+
+Prepared from the published 0.2.0 commit `a35d15213fc16f9756ca426ba42248b05908743e`. The storage regression was reproduced with a native Btrfs pool plus MOS-style persistent service-data bind mounts. This fixture identifies the failure class; it does not identify any particular live host's offending bind.
+
+- Eight new backend regression tests cover safe sibling app-data, subvolume and bind roots, system-data overlap/aliases, root/boot exclusions, conservative non-Btrfs handling, unknown roots, other devices and missing-pool fallback
+- 41 socket-free backend race tests passed; local root-only protected-file test skipped because the executor is non-root
+- 52 frontend API/model/component tests, the production federation build, and 17 package/source/transport/release tests passed
+- Both architecture packages were rebuilt and checked for version, static ELF architecture, web assets, icon, documentation, executable modes, root/root ownership and MD5/SHA-256
+- Independent security review found no blocker; the changes preserve mount-ID verification, descriptor-anchored no-follow creation, private directory requirements and protected-file controls
+
+Local Unix sockets are restricted, so the seven socket integration tests and the mandatory root-owned protected-file fixture must pass in full release CI. A successful release requires green CI for this exact source commit before tagging, followed by green tag CI and verification of all seven published assets. No tests or guards were weakened for this patch.
+
+Real MOS upgrade, authentication, actual host mount behavior, reboot/late-pool behavior, visual rendering and native arm64 execution remain unverified. No NAS settings, files, permissions or services were changed. The historical sections below describe earlier preparations, not the final publication status of 0.2.1.
+
+# Historical verification: Binary Manager 0.2.0
 
 ## 0.2.0 release preparation (2026-10-04)
 

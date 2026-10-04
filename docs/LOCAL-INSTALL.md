@@ -7,7 +7,7 @@ Use MOS Hub for the supported distribution flow described in the main README. Th
 3. Review `scripts/install-local.sh`, then run from the extracted source folder:
 
    ```bash
-   sudo bash scripts/install-local.sh /absolute/path/binary-manager_0.2.0-1+mos-plugin_amd64.deb
+   sudo bash scripts/install-local.sh /absolute/path/binary-manager_0.2.1-1+mos-plugin_amd64.deb
    ```
 
    Substitute the arm64 filename when applicable. The script validates the MOS layout, package identity, version, architecture and checksum, and refuses an existing installation. A matching checksum can be beside the package or in the source bundle's `checksums/` directory

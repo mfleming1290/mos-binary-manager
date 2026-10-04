@@ -306,6 +306,27 @@ test('runtime defaults validation stays local and does not discard the draft', a
     assert.equal(view.mock.value.config.runtimeDefaults.env.MODE, 'ok');
   } finally { view.close(); }
 });
+test('storage help distinguishes filesystem types from pool names and accepts native-pool paths', async () => {
+  const view = mount(createMock(runtimeFixture()));
+  try {
+    await flush(); button(view.element, 'Edit runtime defaults').click(); await flush();
+    let dialog = view.element.querySelector('dialog');
+    assert.match(dialog.textContent, /dedicated private directory/);
+    assert.match(dialog.textContent, /Btrfs pool can also hold Docker or LXC data in separate directories/);
+    assert.match(dialog.textContent, /filesystem, not the pool name/);
+    assert.doesNotMatch(dialog.textContent, /mergerfs.*such as \/mnt\/user/i);
+    input(view.element.querySelector('#bm-storage-root'), '/mnt/user/binary-manager');
+    applySettings(dialog).click(); await flush();
+    assert.equal(view.mock.value.config.runtimeDefaults.storageRoot, '/mnt/user/binary-manager');
+    byLabel(view.element, 'Edit Syncthing').click(); await flush();
+    select(view.element.querySelector('#bm-home-mode'), 'custom'); await flush();
+    dialog = view.element.querySelector('dialog');
+    assert.match(dialog.textContent, /filesystem, not the pool name/);
+    assert.doesNotMatch(dialog.textContent, /mergerfs.*such as \/mnt\/user/i);
+    button(dialog, 'Cancel').click(); await flush();
+    assert.equal(view.element.querySelector('dialog'), null);
+  } finally { view.close(); }
+});
 test('instance runtime saves literal overrides and dedicated paths while preserving ID and nested fields', async () => {
   const view = mount(createMock(runtimeFixture()));
   try {
