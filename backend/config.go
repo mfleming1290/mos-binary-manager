@@ -24,14 +24,16 @@ type App struct {
 	Args      []string                   `json:"args"`
 	Workdir   string                     `json:"workdir"`
 	Autostart bool                       `json:"autostart"`
+	Runtime   *RuntimeSettings           `json:"runtime,omitempty"`
 	Extra     map[string]json.RawMessage `json:"-"`
 }
 type Config struct {
-	SchemaVersion int                        `json:"schemaVersion"`
-	Revision      int64                      `json:"revision"`
-	Folder        string                     `json:"folder"`
-	Apps          []App                      `json:"apps"`
-	Extra         map[string]json.RawMessage `json:"-"`
+	SchemaVersion   int                        `json:"schemaVersion"`
+	Revision        int64                      `json:"revision"`
+	Folder          string                     `json:"folder"`
+	Apps            []App                      `json:"apps"`
+	RuntimeDefaults *RuntimeDefaults           `json:"runtimeDefaults,omitempty"`
+	Extra           map[string]json.RawMessage `json:"-"`
 }
 
 func (a *App) UnmarshalJSON(b []byte) error {
@@ -46,7 +48,7 @@ func (a *App) UnmarshalJSON(b []byte) error {
 	if p.Extra == nil {
 		return errors.New("app must be an object")
 	}
-	for _, k := range []string{"id", "path", "name", "args", "workdir", "autostart"} {
+	for _, k := range []string{"id", "path", "name", "args", "workdir", "autostart", "runtime"} {
 		if v, ok := p.Extra[k]; ok && bytes.Equal(v, []byte("null")) {
 			return fmt.Errorf("%s cannot be null", k)
 		}
@@ -71,7 +73,7 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 	if p.Extra == nil {
 		return errors.New("config must be an object")
 	}
-	for _, k := range []string{"schemaVersion", "revision", "folder", "apps"} {
+	for _, k := range []string{"schemaVersion", "revision", "folder", "apps", "runtimeDefaults"} {
 		if v, ok := p.Extra[k]; ok && bytes.Equal(v, []byte("null")) {
 			return fmt.Errorf("%s cannot be null", k)
 		}
@@ -176,7 +178,10 @@ func validateConfig(c *Config, files bool) error {
 	if c.Apps == nil {
 		c.Apps = []App{}
 	}
-	ids, paths := map[string]bool{}, map[string]bool{}
+	if err := validateRuntimeDefaults(c.RuntimeDefaults); err != nil {
+		return err
+	}
+	ids := map[string]bool{}
 	for i := range c.Apps {
 		a := &c.Apps[i]
 		if !validID.MatchString(a.ID) || ids[a.ID] {
@@ -186,14 +191,6 @@ func validateConfig(c *Config, files bool) error {
 		if err := validAbsolute(a.Path, false); err != nil {
 			return fmt.Errorf("%s: %w", a.ID, err)
 		}
-		path := a.Path
-		if resolved, err := filepath.EvalSymlinks(path); err == nil {
-			path = resolved
-		}
-		if paths[path] {
-			return errors.New("each executable may be configured only once")
-		}
-		paths[path] = true
 		if a.Name == "" {
 			a.Name = filepath.Base(a.Path)
 		}
@@ -218,6 +215,9 @@ func validateConfig(c *Config, files bool) error {
 		}
 		if err := validAbsolute(a.Workdir, true); err != nil {
 			return fmt.Errorf("%s workdir: %w", a.ID, err)
+		}
+		if err := validateRuntimeSettings(a.Runtime, c.RuntimeDefaults); err != nil {
+			return fmt.Errorf("%s runtime: %w", a.ID, err)
 		}
 		if files {
 			if err := executablePath(a.Path); err != nil {
@@ -245,12 +245,14 @@ func mergeUnknown(c *Config, old Config) {
 			c.Extra[k] = v
 		}
 	}
+	mergeRuntimeUnknown(c.RuntimeDefaults, old.RuntimeDefaults)
 	byID := map[string]App{}
 	for _, a := range old.Apps {
 		byID[a.ID] = a
 	}
 	for i := range c.Apps {
 		a := &c.Apps[i]
+		mergeAppRuntimeUnknown(a.Runtime, byID[a.ID].Runtime)
 		if a.Extra == nil {
 			a.Extra = map[string]json.RawMessage{}
 		}

@@ -1,6 +1,6 @@
 import { createApp } from 'vue';
 import Plugin from '../src/Plugin.vue';
-import { createMock } from './mock.js';
+import { createMock, runtimeFixture } from './mock.js';
 
 const real = new URLSearchParams(location.search).get('backend') === 'real';
 // Preview is isolated from the MOS application and uses only a local fixture token.
@@ -14,6 +14,7 @@ if (!real) {
   window.fetch = mock.fetch;
   window.binaryManagerPreview = mock;
   const actions = [
+    ['Runtime settings sample', () => { const sample = runtimeFixture(); sample.config.revision = mock.value.config.revision + 1; mock.value = sample; }],
     ['Fail next action', () => { mock.failNext = true; }],
     ['Conflict next save', () => { mock.conflictNext = true; }],
     ['Toggle outage', () => { mock.failStatus = !mock.failStatus; label.textContent = mock.failStatus ? 'LOCAL PREVIEW · simulated outage active' : 'LOCAL PREVIEW · simulated MOS host'; }],

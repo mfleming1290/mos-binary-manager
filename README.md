@@ -1,6 +1,6 @@
 # Binary Manager for MOS NAS
 
-Version **0.1.1**, prepared for MOS Hub distribution. Select a folder of standalone programs, add individual executable files, and supervise them without systemd.
+Version **0.2.0**, prepared for MOS Hub distribution. Select a folder of standalone programs, add individual executable files, and supervise them without systemd.
 
 ## What it does
 
@@ -10,6 +10,8 @@ Version **0.1.1**, prepared for MOS Hub distribution. Select a folder of standal
 - Starts programs with **Start on boot** checked during MOS's after-services phase, when pools and main services have been started
 - Shows process state, PID, restart count, last exit/error and bounded recent output
 - Accepts optional working directory and literal arguments, one argument per line; a blank working directory defaults to the executable’s folder
+- Runs separately named instances of the same executable with independent IDs, controls, logs and boot selections
+- Offers opt-in persistent per-instance HOME, additional PATH directories, ordinary environment overrides/unsets, protected environment-file references and shared defaults
 
 Newly discovered files are never automatically added or executed. Adding a program does not start it. Neither this source tree nor building the package installs anything on a NAS.
 
@@ -23,13 +25,19 @@ Run programs in the **foreground**. Disable their own daemon/background mode. Th
 - **Start on boot** is independent and persistent. A checked program starts again next boot even if you manually stopped it this session. Uncheck it to prevent that
 - Nonzero exits and terminating signals restart with exponential backoff, from 1 second to at most 30 seconds. A stable run resets the delay
 - A clean exit (code 0) stays stopped. Use **Restart** or toggle on to run it again
-- Program or argument changes can require a controlled stop/restart; inspect status after applying edits
+- Applying execution-setting changes restarts only affected instances whose Keep running is enabled; stopped instances stay stopped. Renaming and boot selection do not restart an app
 - Up to 32 configured programs. Discovery is nonrecursive and reads at most 2,048 directory entries; large folders show a truncation warning. Symlink binaries are not accepted; pick the actual executable
 - Logs are bounded, transient and private to this runtime. Configure a program's own persistent logs on pool storage if needed; do not put busy logs on boot media
 - Linux with pidfd support (kernel 5.3+) is required for safe signaling. The helper fails closed if that support is unavailable
 - A stopped/crashed supervisor is recovered by the next plugin request or boot hook. This is a small homelab supervisor, not a high-availability service manager
 
 Settings and boot selections persist under `/boot/optional/plugins/binary-manager/settings.json`. Live state, socket and logs belong under `/run/binary-manager`. Config writes use revision checks and atomic replacement; two tabs cannot silently overwrite each other's plugin edits. Do not edit its JSON while the supervisor is running or use MOS's generic settings POST for this plugin.
+
+## Persistent instance settings
+
+Existing entries retain their inherited HOME and environment until you enable their runtime settings. No dotfiles, credentials or application state are automatically moved. Start with [the instance setup guide](docs/INSTANCE-SETTINGS.md) to choose pool-backed storage, isolate duplicates and configure PATH or environment variables. Shared defaults affect only opted-in instances; setting defaults does not migrate old apps.
+
+Protected environment files are read by the host and passed to the child privately. Only their file paths are saved in settings. Ordinary environment values, executable arguments and other settings are visible to the browser and must not contain secrets. Child programs can print secrets into their own logs; the manager cannot guarantee redaction.
 
 ## Install through MOS Hub
 
@@ -38,7 +46,7 @@ This package is prepared for the supplied `mfleming1290/mos-hub` catalog, with `
 Once the GitHub release has passed the workflow and the Hub entry has been published:
 
 1. Refresh the configured MOS Hub repository and find **Binary Manager** under **Utilities**
-2. For a first installation, select numeric release **0.1.1** and install. For an existing installation, use MOS's **plugin update** flow instead. MOS selects the matching `amd64` or `arm64` package and retrieves the tag's source files itself
+2. For a first installation, select numeric release **0.2.0** and install. For an existing installation, use MOS's **plugin update** flow instead. MOS selects the matching `amd64` or `arm64` package and retrieves the tag's source files itself
 3. Wait for the MOS completion notification, reload MOS, then open **Plugins → Binary Manager**
 4. Select a binaries folder or add one executable. Explicitly turn on **Keep running** to start it. Use **Start on boot** separately
 5. Test stop, logs, an intentional failure/restart, a clean exit, and finally an actual reboot before relying on it

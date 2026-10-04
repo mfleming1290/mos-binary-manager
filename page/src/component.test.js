@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import { JSDOM } from 'jsdom';
-import { createMock, fixture } from '../preview/mock.js';
+import { createMock, fixture, runtimeFixture } from '../preview/mock.js';
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://preview.invalid' });
 for (const key of ['window', 'document', 'Element', 'HTMLElement', 'SVGElement', 'Node', 'Event', 'MouseEvent', 'CustomEvent']) globalThis[key] = dom.window[key];
@@ -225,4 +225,165 @@ test('automatic recovery replaces outdated mutation-disabled wording without hid
     statusFail = false; await manager.refresh(false);
     assert.equal(manager.disabled.value, false); assert.match(manager.error.value, /Status is current now/); assert.doesNotMatch(manager.error.value, /disabled until/);
   } finally { app.unmount(); element.remove(); }
+});
+
+const applySettings = element => button(element, 'Apply & restart affected running instances');
+const select = (element, value) => { element.value = value; element.dispatchEvent(new Event('change', { bubbles: true })); };
+
+
+test('manual add and discovery can add multiple stopped instances of an existing executable', async () => {
+  const view = mount();
+  try {
+    await flush(); const path = view.mock.value.config.apps[0].path;
+    input(view.element.querySelector('#bm-manual'), path); submit(view.element.querySelector('#bm-manual').closest('form')); await flush();
+    assert.equal(view.mock.value.config.apps.filter(app => app.path === path).length, 2);
+    byLabel(view.element, 'Add syncthing').click(); await flush();
+    const matches = view.mock.value.config.apps.filter(app => app.path === path);
+    assert.equal(matches.length, 3); assert.equal(new Set(matches.map(app => app.id)).size, 3);
+    for (const app of matches.slice(1)) { assert.equal(app.autostart, false); assert.equal('runtime' in app, false); assert.equal(view.mock.value.apps.find(state => state.id === app.id).desired, false); }
+    assert.ok(byLabel(view.element, 'Add syncthing')); assert.equal(view.mock.calls.some(call => call.action === 'toggle'), false);
+  } finally { view.close(); }
+});
+test('duplicate starts with separate managed HOME, new secure ID and cleared private references', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis.crypto, 'randomUUID');
+  Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: undefined });
+  const view = mount(createMock(runtimeFixture()));
+  try {
+    await flush(); const original = structuredClone(view.mock.value.config.apps[0]);
+    byLabel(view.element, 'Duplicate Syncthing').click(); byLabel(view.element, 'Duplicate Syncthing').click(); await flush();
+    assert.equal(view.mock.calls.filter(call => call.action === 'save').length, 1);
+    const copy = view.mock.value.config.apps.at(-1);
+    assert.match(copy.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.notEqual(copy.id, original.id); assert.equal(copy.name, 'Syncthing copy'); assert.equal(copy.autostart, false);
+    assert.deepEqual(copy.runtime.env, original.runtime.env); assert.deepEqual(copy.args, original.args);
+    assert.equal(copy.runtime.homeMode, 'managed'); assert.equal(copy.runtime.useDefaults, false);
+    for (const key of ['home', 'envFile', 'xdgConfigHome', 'xdgDataHome', 'xdgCacheHome']) assert.equal(copy.runtime[key], '');
+    assert.equal(byLabel(view.element, 'Keep Syncthing copy running').checked, false); assert.equal(byLabel(view.element, 'Start Syncthing copy on boot').checked, false);
+    assert.equal(view.mock.calls.some(call => call.action === 'toggle' || call.action === 'restart'), false);
+    assert.deepEqual(view.mock.value.config.apps[0], original); assert.match(view.element.textContent, /Protected environment file.*were not copied/);
+  } finally { view.close(); if (descriptor) Object.defineProperty(globalThis.crypto, 'randomUUID', descriptor); else delete globalThis.crypto.randomUUID; }
+});
+test('duplicate without storage root opens a blank defaults form and cancel has no side effects', async () => {
+  const view = mount();
+  try {
+    await flush(); byLabel(view.element, 'Duplicate Syncthing').click(); await flush();
+    assert.equal(view.element.querySelector('#bm-storage-root').value, '');
+    assert.match(view.element.querySelector('dialog').textContent, /Choose a persistent storage root first/);
+    button(view.element.querySelector('dialog'), 'Cancel').click(); await flush();
+    assert.equal(view.element.querySelector('dialog'), null); assert.equal(view.mock.calls.some(call => call.action === 'save'), false);
+    assert.equal(view.mock.value.config.apps.length, 2);
+  } finally { view.close(); }
+});
+test('saving shared defaults preserves unknown fields and legacy behavior, without implicitly duplicating', async () => {
+  const view = mount(createMock(runtimeFixture()));
+  try {
+    await flush(); button(view.element, 'Edit runtime defaults').click(); await flush();
+    input(view.element.querySelector('#bm-storage-root'), '/mnt/preview-pool/new-root');
+    input(view.element.querySelector('#bm-default-path'), '/opt/tools\n/mnt/preview-pool/shared');
+    input(view.element.querySelector('#bm-default-env'), 'NEW= literal $(id) \nEMPTY=\n!REMOVE');
+    applySettings(view.element.querySelector('dialog')).click(); await flush();
+    const saved = view.mock.calls.find(call => call.action === 'save');
+    assert.equal(saved.expectedRevision, 2); assert.equal(saved.config.runtimeDefaults.storageRoot, '/mnt/preview-pool/new-root');
+    assert.deepEqual(saved.config.runtimeDefaults.pathDirs, ['/opt/tools', '/mnt/preview-pool/shared']);
+    assert.deepEqual(saved.config.runtimeDefaults.env, { NEW: ' literal $(id) ', EMPTY: '', REMOVE: null });
+    assert.deepEqual(saved.config.runtimeDefaults.futureDefaults, { keep: true });
+    assert.equal('runtime' in saved.config.apps[1], false); assert.equal(saved.config.apps.length, 2);
+    assert.equal(view.mock.value.apps[1].desired, false); assert.equal(view.mock.calls.some(call => call.action === 'restart' || call.action === 'toggle'), false);
+    assert.equal(view.element.querySelector('dialog'), null);
+  } finally { view.close(); }
+});
+test('runtime defaults validation stays local and does not discard the draft', async () => {
+  const view = mount();
+  try {
+    await flush(); button(view.element, 'Edit runtime defaults').click(); await flush();
+    input(view.element.querySelector('#bm-storage-root'), '/mnt/preview-pool/root');
+    input(view.element.querySelector('#bm-default-env'), 'HOME=must-not-be-echoed');
+    applySettings(view.element.querySelector('dialog')).click(); await flush();
+    assert.equal(view.mock.calls.some(call => call.action === 'save'), false); assert.match(view.element.querySelector('[role="alert"]').textContent, /reserved|dedicated/);
+    assert.doesNotMatch(view.element.querySelector('[role="alert"]').textContent, /must-not-be-echoed/);
+    assert.equal(view.element.querySelector('#bm-storage-root').value, '/mnt/preview-pool/root');
+    input(view.element.querySelector('#bm-default-env'), 'MODE=ok'); applySettings(view.element.querySelector('dialog')).click(); await flush();
+    assert.equal(view.mock.value.config.runtimeDefaults.env.MODE, 'ok');
+  } finally { view.close(); }
+});
+test('instance runtime saves literal overrides and dedicated paths while preserving ID and nested fields', async () => {
+  const view = mount(createMock(runtimeFixture()));
+  try {
+    await flush(); const id = view.mock.value.config.apps[0].id;
+    byLabel(view.element, 'Edit Syncthing').click(); await flush();
+    assert.equal(view.element.querySelector('#bm-runtime-enabled').checked, true); assert.equal(view.element.querySelector('#bm-use-defaults').checked, false);
+    check(view.element.querySelector('#bm-use-defaults'), true); select(view.element.querySelector('#bm-home-mode'), 'managed');
+    input(view.element.querySelector('#bm-runtime-path'), '/opt/first\n/mnt/preview-pool/bin');
+    input(view.element.querySelector('#bm-runtime-env'), 'MODE= instance $(literal) \nEMPTY=\n!SHARED');
+    input(view.element.querySelector('#bm-env-file'), '/mnt/preview-pool/private/new.env');
+    input(view.element.querySelector('#bm-xdg-config'), '/mnt/preview-pool/new-config');
+    assert.match(view.element.querySelector('dialog').textContent, /visible in this browser/);
+    assert.match(view.element.querySelector('dialog').textContent, /working directory is separate from HOME/);
+    applySettings(view.element.querySelector('dialog')).click(); await flush();
+    const saved = view.mock.value.config.apps[0]; assert.equal(saved.id, id); assert.equal(saved.runtime.useDefaults, true); assert.equal(saved.runtime.homeMode, 'managed');
+    assert.deepEqual(saved.runtime.env, { MODE: ' instance $(literal) ', EMPTY: '', SHARED: null });
+    assert.deepEqual(saved.runtime.pathDirs, ['/opt/first', '/mnt/preview-pool/bin']); assert.equal(saved.runtime.envFile, '/mnt/preview-pool/private/new.env');
+    assert.equal(saved.runtime.xdgConfigHome, '/mnt/preview-pool/new-config'); assert.deepEqual(saved.runtime.futureRuntime, { keep: true });
+    assert.equal(saved.futureAppKey, 'preserved'); assert.equal(view.mock.calls.some(call => call.action !== 'status' && call.action !== 'save'), false);
+  } finally { view.close(); }
+});
+test('runtime opt-in and opt-out are explicit and cancel never changes either', async () => {
+  const view = mount();
+  try {
+    await flush(); byLabel(view.element, 'Edit Restic backup').click(); await flush();
+    assert.equal(view.element.querySelector('#bm-runtime-enabled').checked, false); check(view.element.querySelector('#bm-runtime-enabled'), true); await flush();
+    assert.equal(view.element.querySelector('#bm-home-mode').value, 'inherit');
+    input(view.element.querySelector('#bm-runtime-env'), 'COLOR=blue'); button(view.element.querySelector('dialog'), 'Cancel').click(); await flush();
+    assert.equal('runtime' in view.mock.value.config.apps[1], false); assert.equal(view.mock.calls.some(call => call.action === 'save'), false);
+    byLabel(view.element, 'Edit Restic backup').click(); await flush(); check(view.element.querySelector('#bm-runtime-enabled'), true); await flush();
+    input(view.element.querySelector('#bm-runtime-env'), 'COLOR=green'); applySettings(view.element.querySelector('dialog')).click(); await flush();
+    assert.equal(view.mock.value.config.apps[1].runtime.env.COLOR, 'green'); assert.equal(view.mock.value.apps[1].desired, false);
+    byLabel(view.element, 'Edit Restic backup').click(); await flush(); check(view.element.querySelector('#bm-runtime-enabled'), false); await flush();
+    applySettings(view.element.querySelector('dialog')).click(); await flush(); assert.equal('runtime' in view.mock.value.config.apps[1], false);
+  } finally { view.close(); }
+});
+for (const kind of ['instance', 'defaults']) test(`${kind} settings keep a failed CAS draft visible and require explicit reopen`, async () => {
+  const view = mount(createMock(runtimeFixture()));
+  try {
+    await flush();
+    if (kind === 'instance') byLabel(view.element, 'Edit Syncthing').click(); else button(view.element, 'Edit runtime defaults').click();
+    await flush(); const selector = kind === 'instance' ? '#bm-runtime-env' : '#bm-default-env';
+    input(view.element.querySelector(selector), 'LOCAL=unsaved');
+    if (kind === 'instance') view.mock.value.config.apps[0].runtime.env = { REMOTE: 'newer' }; else view.mock.value.config.runtimeDefaults.env = { REMOTE: 'newer' };
+    view.mock.value.config.revision = 11;
+    button(view.element, 'Refresh').click(); await flush();
+    applySettings(view.element.querySelector('dialog')).click(); await flush();
+    assert.equal(view.mock.calls.find(call => call.action === 'save').expectedRevision, 2);
+    assert.equal(view.mock.value.config.revision, 11); assert.equal(view.element.querySelector(selector).value, 'LOCAL=unsaved');
+    assert.equal(applySettings(view.element.querySelector('dialog')).disabled, true);
+    assert.match(view.element.querySelector('dialog').textContent, /Close and reopen/);
+    submit(view.element.querySelector('dialog form')); await flush(); assert.equal(view.mock.calls.filter(call => call.action === 'save').length, 1);
+    button(view.element.querySelector('dialog'), 'Cancel').click(); await flush();
+    if (kind === 'instance') byLabel(view.element, 'Edit Syncthing').click(); else button(view.element, 'Edit runtime defaults').click();
+    await flush(); assert.equal(view.element.querySelector(selector).value, 'REMOTE=newer'); assert.equal(applySettings(view.element.querySelector('dialog')).disabled, false);
+  } finally { view.close(); }
+});
+test('stale host status prevents duplicates and applying runtime drafts until refresh', async () => {
+  const view = mount(createMock(runtimeFixture()));
+  try {
+    await flush(); button(view.element, 'Edit runtime defaults').click(); await flush();
+    input(view.element.querySelector('#bm-default-env'), 'LOCAL=kept'); view.mock.failStatus = true;
+    button(view.element, 'Refresh').click(); await flush();
+    assert.equal(byLabel(view.element, 'Duplicate Syncthing').disabled, true); assert.equal(applySettings(view.element.querySelector('dialog')).disabled, true);
+    submit(view.element.querySelector('dialog form')); await flush(); assert.equal(view.mock.calls.some(call => call.action === 'save'), false);
+    view.mock.failStatus = false; button(view.element, 'Retry status').click(); await flush();
+    assert.equal(view.element.querySelector('#bm-default-env').value, 'LOCAL=kept'); assert.equal(applySettings(view.element.querySelector('dialog')).disabled, false);
+    applySettings(view.element.querySelector('dialog')).click(); await flush(); assert.deepEqual(view.mock.value.config.runtimeDefaults.env, { LOCAL: 'kept' });
+  } finally { view.close(); }
+});
+test('nested picker cancellation preserves runtime draft and log warning covers secrets', async () => {
+  const view = mount(createMock(runtimeFixture()));
+  try {
+    await flush(); byLabel(view.element, 'Edit Syncthing').click(); await flush();
+    input(view.element.querySelector('#bm-runtime-env'), 'LOCAL=preserve');
+    button(view.element.querySelector('dialog'), 'Browse').click(); await flush(); button(view.element.querySelector('dialog'), 'Cancel').click(); await flush();
+    assert.equal(view.element.querySelector('#bm-runtime-env').value, 'LOCAL=preserve');
+    button(view.element.querySelector('dialog'), 'Cancel').click(); await flush(); assert.equal(view.mock.calls.some(call => call.action === 'save'), false);
+    byLabel(view.element, 'View Syncthing logs').click(); await flush(); assert.match(view.element.querySelector('dialog').textContent, /may contain secrets/);
+  } finally { view.close(); }
 });

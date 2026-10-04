@@ -73,6 +73,16 @@ func TestFixtureProcess(t *testing.T) {
 		os.Exit(91)
 	}
 	switch args[0] {
+	case "environment":
+		cwd, _ := os.Getwd()
+		env := map[string]string{"HOME": os.Getenv("HOME"), "PATH": os.Getenv("PATH"), "INSTANCE_VALUE": os.Getenv("INSTANCE_VALUE"), "cwd": cwd}
+		data, _ := json.Marshal(env)
+		_ = os.WriteFile(filepath.Join(os.Getenv("HOME"), ".instance"), []byte(os.Getenv("INSTANCE_VALUE")), 0600)
+		_ = os.WriteFile(args[1], data, 0600)
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT)
+		<-ch
+		os.Exit(0)
 	case "wait":
 		if len(args) > 1 {
 			_ = os.WriteFile(args[1], []byte(strconv.Itoa(os.Getpid())), 0600)
@@ -185,8 +195,8 @@ func fixtureApp(t *testing.T, id, mode string, extra ...string) App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Separate actual executable copies permit multiple configurations without
-	// weakening the backend's same-executable duplicate guard.
+	// Independent executable copies keep fixture working directories isolated.
+	// Duplicate-instance tests deliberately reuse one copy.
 	dest := filepath.Join(t.TempDir(), id+" 'quoted' ;& executable")
 	b, err := os.ReadFile(self)
 	if err != nil {

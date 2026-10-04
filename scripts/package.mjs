@@ -41,6 +41,8 @@ for (const arch of arches) {
     for (const [source, target] of [['README.md', 'README.md'], ['LICENSE', 'LICENSE'], ['docs/THIRD_PARTY_NOTICES.txt', 'THIRD_PARTY_NOTICES.txt']]) {
       cpSync(join(root, source), join(tree, 'usr/share/doc/binary-manager-plugin', target));
     }
+    mkdirSync(join(tree, 'usr/share/doc/binary-manager-plugin/docs'), { recursive: true });
+    cpSync(join(root, 'docs/INSTANCE-SETTINGS.md'), join(tree, 'usr/share/doc/binary-manager-plugin/docs/INSTANCE-SETTINGS.md'));
     writeFileSync(join(tree, 'DEBIAN/control'), [
       'Package: binary-manager-plugin', `Version: ${manifest.version}-1+mos-plugin`, `Architecture: ${arch}`,
       `Maintainer: ${config.author}`, 'Section: admin', 'Priority: optional',

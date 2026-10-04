@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Existing numeric tag to build and release (for example 0.1.1)'
+        description: 'Existing numeric tag to build and release (for example 0.2.0)'
         required: true
-        default: '0.1.1'
+        default: '0.2.0'
         type: string
 
 permissions:
@@ -55,10 +55,18 @@ jobs:
         working-directory: backend
         env:
           BINARY_MANAGER_TEST_RACE: '1'
+          BINARY_MANAGER_TEST_STORAGE: ${{ runner.temp }}
         run: |
           test -z "$(gofmt -l *.go)"
           go vet ./...
           go test -race -count=1 -timeout=8m ./...
+      - name: Test protected environment files with root-owned temporary fixtures
+        working-directory: backend
+        run: |
+          sudo env PATH="$PATH" GOTOOLCHAIN=local GOCACHE="$RUNNER_TEMP/go-root-cache" \
+            BINARY_MANAGER_GO="$(command -v go)" BINARY_MANAGER_TEST_STORAGE="$RUNNER_TEMP" \
+            BINARY_MANAGER_REQUIRE_ROOT_TEST=1 \
+            "$(command -v go)" test -count=1 -timeout=2m -run '^TestRootProtectedEnvFileEndToEnd$' .
       - name: Install locked frontend dependencies
         working-directory: page
         run: npm ci --ignore-scripts --no-audit --no-fund

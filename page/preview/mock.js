@@ -62,3 +62,11 @@ export function createMock(initial = fixture()) {
   };
   return state;
 }
+
+// Simulated paths only; no mounted pool is inferred for a real NAS.
+export function runtimeFixture() {
+  const data = fixture();
+  data.config.runtimeDefaults = { storageRoot: '/mnt/preview-pool/instances', pathDirs: ['/mnt/preview-pool/tools'], env: { SHARED: 'yes', REMOVE: null }, futureDefaults: { keep: true } };
+  data.config.apps[0].runtime = { useDefaults: false, homeMode: 'custom', home: '/mnt/preview-pool/original', pathDirs: ['/opt/bin'], env: { MODE: 'one', EMPTY: '' }, envFile: '/mnt/preview-pool/private/original.env', xdgConfigHome: '/mnt/preview-pool/config', xdgDataHome: '/mnt/preview-pool/data', xdgCacheHome: '/mnt/preview-pool/cache', futureRuntime: { keep: true } };
+  return data;
+}

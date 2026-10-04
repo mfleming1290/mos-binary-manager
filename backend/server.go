@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -66,31 +64,33 @@ type Exit struct {
 	At     string `json:"at"`
 }
 type RuntimeApp struct {
-	App        App
-	Desired    bool
-	Owned      *Owned
-	State      string
-	Restarts   int
-	Failures   int
-	LastExit   *Exit
-	Error      string
-	Started    time.Time
-	Next       time.Time
-	Generation int
-	Log        *tailLog
-	Done       chan struct{}
+	App           App
+	Desired       bool
+	Owned         *Owned
+	State         string
+	Restarts      int
+	Failures      int
+	LastExit      *Exit
+	Error         string
+	Started       time.Time
+	Next          time.Time
+	Generation    int
+	Log           *tailLog
+	Done          chan struct{}
+	ProtectedKeys []string // names only from the last launch; never values
 }
 type Supervisor struct {
-	mu          sync.Mutex
-	p           Paths
-	cfg         Config
-	configError error
-	bootID      string
-	bootApplied bool
-	apps        map[string]*RuntimeApp
-	closing     bool
-	listener    net.Listener
-	done        chan struct{}
+	mu            sync.Mutex
+	p             Paths
+	cfg           Config
+	configError   error
+	bootID        string
+	bootApplied   bool
+	apps          map[string]*RuntimeApp
+	closing       bool
+	listener      net.Listener
+	done          chan struct{}
+	runtimeMounts func() ([]mountRecord, error) // nil reads the real kernel mount table
 }
 
 func bootID() (string, error) {
@@ -201,11 +201,15 @@ func (s *Supervisor) start(a *RuntimeApp, automatic bool) {
 		s.failed(a, err)
 		return
 	}
-	launchApp := a.App
-	launchApp.Extra = nil
-	payload, err := json.Marshal(launchApp)
+	env, protectedKeys, err := prepareRuntimeDetails(a.App, s.cfg.RuntimeDefaults, true, s.runtimeMounts)
 	if err != nil {
 		s.failed(a, err)
+		return
+	}
+	env = append(env, ownerKey+hex.EncodeToString(token))
+	payload, err := json.Marshal(launchConfig{Path: a.App.Path, Args: a.App.Args, Workdir: a.App.Workdir, Env: env})
+	if err != nil || len(payload) > maxLaunchJSON {
+		s.failed(a, errors.New("launch configuration exceeds size limit"))
 		return
 	}
 	r, w, err := os.Pipe()
@@ -213,16 +217,10 @@ func (s *Supervisor) start(a *RuntimeApp, automatic bool) {
 		s.failed(a, err)
 		return
 	}
-	cmd := exec.Command(self, "__child", base64.RawURLEncoding.EncodeToString(payload))
+	cmd := exec.Command(self, "__child")
 	cmd.ExtraFiles = []*os.File{r}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	env := []string{}
-	for _, v := range os.Environ() {
-		if !strings.HasPrefix(v, ownerKey) && !strings.HasPrefix(v, "BINARY_MANAGER_ROOT=") {
-			env = append(env, v)
-		}
-	}
-	cmd.Env = append(env, ownerKey+hex.EncodeToString(token))
+	cmd.Env = append(baseEnvironment(), ownerKey+hex.EncodeToString(token))
 	cmd.Stdout = a.Log
 	cmd.Stderr = a.Log
 	// Prevent grandchildren holding stdout open from blocking cmd.Wait forever.
@@ -242,6 +240,7 @@ func (s *Supervisor) start(a *RuntimeApp, automatic bool) {
 		return
 	}
 	a.Owned = &Owned{Token: hex.EncodeToString(token), Root: info.ProcessRef, Known: []ProcessRef{info.ProcessRef}}
+	a.ProtectedKeys = protectedKeys
 	a.Generation++
 	generation := a.Generation
 	a.Done = make(chan struct{})
@@ -263,7 +262,7 @@ func (s *Supervisor) start(a *RuntimeApp, automatic bool) {
 		close(a.Done)
 		return
 	}
-	if _, err = w.Write([]byte{1}); err != nil {
+	if _, err = w.Write(append([]byte{1}, payload...)); err != nil {
 		a.Error = "launch handshake failed: " + err.Error()
 	}
 	w.Close()
@@ -354,9 +353,6 @@ func (s *Supervisor) stop(a *RuntimeApp) error {
 	a.Error = ""
 	return nil
 }
-func sameExecution(a, b App) bool {
-	return a.Path == b.Path && a.Workdir == b.Workdir && reflect.DeepEqual(a.Args, b.Args)
-}
 
 // Stop affected trees before committing a requested settings change. If stop
 // fails, retain the old visible app/config and allow the user to retry safely.
@@ -370,7 +366,7 @@ func (s *Supervisor) prepareConfig(c Config) error {
 	var firstErr error
 	for id, a := range s.apps {
 		n, exists := next[id]
-		if !exists || !sameExecution(n, a.App) {
+		if !exists || !sameExecutionWithKeys(n, c.RuntimeDefaults, a.App, s.cfg.RuntimeDefaults, a.ProtectedKeys) {
 			wg.Add(1)
 			go func(a *RuntimeApp) {
 				defer wg.Done()
@@ -414,7 +410,7 @@ func (s *Supervisor) apply(c Config) error {
 	var errMu sync.Mutex
 	for id, r := range s.apps {
 		a, ok := newApps[id]
-		if !ok || !sameExecution(a, r.App) {
+		if !ok || !sameExecutionWithKeys(a, c.RuntimeDefaults, r.App, s.cfg.RuntimeDefaults, r.ProtectedKeys) {
 			wg.Add(1)
 			go func(id string, r *RuntimeApp) {
 				defer wg.Done()
@@ -659,6 +655,9 @@ func (s *Supervisor) handle(req Request) map[string]any {
 			return failure("INVALID_CONFIG", err)
 		}
 		if err := validateChangedFiles(c, s.cfg); err != nil {
+			return failure("INVALID_CONFIG", err)
+		}
+		if err := validateChangedRuntime(c, s.cfg, s.runtimeMounts, s.apps); err != nil {
 			return failure("INVALID_CONFIG", err)
 		}
 		if err := s.prepareConfig(c); err != nil {

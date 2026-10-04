@@ -1,10 +1,37 @@
-# Verification: Binary Manager 0.1.1
+# Verification: Binary Manager 0.2.0
 
-## 0.1.1 patch
+## 0.2.0 release preparation (2026-10-04)
+
+Prepared in a cloud Linux workspace, without publication or NAS installation. The exact 0.1.1 remote baseline a99f80d7bf5ed424297faee08fb0a05ec9aa091b was independently reconstructed and all 55 source-file Git blob hashes matched before reviewing the feature diff.
+
+### Passed locally
+
+- 33 socket-free backend tests under the Go race detector, including concurrent duplicate instances using the same executable, independent HOME/dotfiles/environment, stopping/removing one without affecting another, defaults affecting only selected instances, stale config revisions, legacy/unknown-field preservation, private launch authorization and secret-marker nondisclosure
+- Mount-selection and real no-follow file-descriptor directory-operation tests with injected test mount metadata; missing actual pool and nested-mount tests confirm no fallback directory creation. These simulations do not claim a real pool was mounted in this executor
+- Protected-file literal parser, invalid-key/value/size checks, insecure ownership/modes/symlink/FIFO rejection, redacted errors and private-pipe secret delivery. Positive root-owned protected-file reading is not claimed locally
+- Go formatting and vet, 51 frontend API/model/component tests, and production federation build
+- 17 independent package/source/transport/release tests, plus workflow YAML and shell/Python syntax checks
+- Both amd64 and arm64 Debian packages extracted and checked for static ELF architecture, root/root archive ownership, executable modes, exact frontend assets and settings-guide bytes, correct manifest/version, lifecycle hook contents, and matching MD5/SHA-256
+- The packaged amd64 helper passed an independent authorization-pipe test: EOF/invalid permits execute nothing, literal argv/environment reach the fixture, and helper argv/errors do not contain the private marker
+- Independent code review found and fixed an explicit HOME/XDG validation bypass where the effective value equaled the inherited value. Regression coverage now separates validation-input changes from affected-runtime comparison. Final review found no remaining code blockers
+
+### Not verified here
+
+- The seven full Unix-socket CLI integration tests encounter sandbox `operation not permitted`. Socket controls and auth were not weakened or replaced. The release CI still requires the full race/socket suite
+- The accepted root-owned protected-file end-to-end test is skipped under this non-root executor. CI has a separate mandatory root-only step using temporary fixtures, with `BINARY_MANAGER_REQUIRE_ROOT_TEST=1` so it cannot silently skip; it covers secret-file launch and effective-env restart masking
+- Mount simulations use a non-system workspace path; CI explicitly sets `BINARY_MANAGER_TEST_STORAGE` so these tests cannot fall back to a skipped `/tmp` path
+- Cloud browser preview access was blocked, and a later preview startup hit a Node network-interface error. DOM interaction tests pass; actual visual rendering on MOS remains unverified
+- Real MOS upgrade, plugin authentication, actual native/NFS/CIFS mounts, late/offline-pool boot behavior, reboot and native arm64 execution remain host-verification steps
+
+Managed/custom HOME and explicit XDG paths deliberately reject mergerfs virtual pools, including `/mnt/user` when it is mergerfs. Select an underlying mounted persistent pool; the UI and error explain this limitation. Existing entries keep inherited behavior until runtime settings are explicitly enabled. No files, credentials or permissions on a NAS were changed.
+
+The prepared 0.2.0 release must pass its full CI (including root-only and socket paths) after publication is authorized. Passing local package checks alone is not a claim of host readiness.
+
+## Historical 0.1.1 patch
 
 The frontend fix was independently reviewed and passed all 30 frontend API/model/component tests plus the production federation build before release preparation. Coverage includes the native UUID path, a secure UUID v4 fallback, missing secure randomness, and both add flows with `randomUUID` unavailable. Actual MOS-browser testing remains unverified.
 
-The release workflow must pass its complete backend race/socket suite, frontend tests and dual-architecture package checks on the exact 0.1.1 commit before publication.
+The 0.1.1 baseline was published at a99f80d7bf5ed424297faee08fb0a05ec9aa091b with successful CI. This 0.2.0 preparation was compared against that exact remote tree by Git blob hashes; all 55 baseline source files were verified. The older local Git HEAD was not treated as the publication baseline.
 
 ## Historical 0.1.0 preparation record
 

@@ -53,6 +53,7 @@ for package in packages:
         for filename in ['functions', 'settings.json']:
             assert (extracted / 'files/usr/share/binary-manager' / filename).read_bytes() == (project / filename).read_bytes()
         docs = extracted / 'files/usr/share/doc/binary-manager-plugin'
+        assert (docs / 'docs/INSTANCE-SETTINGS.md').read_bytes() == (project / 'docs/INSTANCE-SETTINGS.md').read_bytes()
         assert (docs / 'LICENSE').read_bytes() == (project / 'LICENSE').read_bytes()
         assert (docs / 'THIRD_PARTY_NOTICES.txt').read_bytes() == (project / 'docs/THIRD_PARTY_NOTICES.txt').read_bytes()
         control = extracted / 'control'

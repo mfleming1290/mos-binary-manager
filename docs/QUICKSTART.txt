@@ -1,17 +1,27 @@
-MOS BINARY MANAGER 0.1.1 — HUB TEST RELEASE PREPARATION
+MOS BINARY MANAGER 0.2.0 — PREPARED RELEASE
 
-THE TWO PARTS
-1. Plugin source goes in the confirmed mfleming1290/mos-binary-manager repository, including the hidden .github/workflows/build-plugin.yml file.
-2. hub/plugins/binary-manager.json and hub/images/binary-managerIcon.svg go in the corresponding plugins/ and images/ folders of mfleming1290/mos-hub.
+UPDATE SAFELY
+For an existing installation, use MOS's plugin update flow after the release is published. Wait for completion and reload MOS. Do not reinstall over existing settings. This package preparation does not publish or install anything.
 
-Publish the tested GitHub release first, then add/refresh the Hub entry. The supplied files do not mean either remote change has happened. See docs/HUB-RELEASE.md for exact steps and version rules.
+EXISTING APPS
+Existing IDs, boot flags, arguments and inherited HOME/environment stay unchanged until you enable runtime settings in an app's editor. Nothing moves your old dotfiles or credentials automatically.
 
-INSTALL OR UPDATE AFTER PUBLICATION
-In MOS Hub, refresh your configured repository, find Binary Manager under Utilities, and select release 0.1.1. Use the plugin update flow for an existing installation; use Install only for a first installation. MOS chooses the amd64 or arm64 package. Wait for completion, reload MOS, and open Plugins → Binary Manager. No local install script is needed.
+PERSISTENT PER-INSTANCE HOME
+Open Runtime defaults and choose a storage root inside a real mounted MOS pool. Then Edit an instance, enable runtime settings and choose Managed HOME. Each ID gets <storage-root>/<id>/home. The host checks the mounted storage before creating directories. A missing pool causes a clear failure rather than writing state into RAM. HOME is separate from Working directory.
 
-FIRST CHECK
-Select a folder or browse for an executable. Adding does not start it. Switch Keep running on explicitly. Start on boot is separate. Programs run as root in standard MOS; use trusted foreground programs only. Errors restart with 1–30 second backoff; a clean exit stays stopped.
+PATH AND ENVIRONMENT
+Add absolute PATH directories one per line. Ordinary environment lines are literal KEY=value; !KEY removes a value and KEY= sets empty. Shared defaults apply only to instances that opt in. No shell expansion or profile sourcing occurs. Ordinary settings are browser-visible: never put secrets there.
 
-Start with tests/fixtures/loop.sh, fail.sh and exit-clean.sh on executable pool storage. Check stop, logs, failure restart, clean exit and reboot. Turn off the failure fixture when done. Actual MOS installation, upgrades and reboot are not yet verified.
+SECRETS
+Create a protected root-owned 0600/0400 environment file on the host and enter only its path. Its literal KEY=value contents are delivered privately on launch, never added to status or command arguments. Restart the instance after changing the file. Application logs may still print secrets.
 
-Existing local-test install? Back up its settings and resolve migration before using Hub. Do not reinstall over it or delete its settings. Hub's initial install and its plugin update are different paths.
+DUPLICATE
+Duplicate creates a separate named entry with a new ID and managed HOME. It starts disabled, with Start on boot off, and clears the protected-file and explicit XDG references. Review ports, shared-state arguments and credentials before enabling it. Stopping one instance does not intentionally stop another.
+
+APPLY
+Applying execution changes restarts only affected instances with Keep running enabled. Stopped instances remain stopped. Name and boot edits do not restart apps. Back up and migrate application data yourself before changing HOME or storage root; no files are moved or deleted automatically.
+
+TEST FIRST
+Programs run as root on standard MOS; use trusted foreground programs only. Test harmless loop/failure/clean-exit fixtures, separate HOME and environment values, duplicate isolation, missing-pool behavior, stop, logs and actual reboot. A clean exit stays stopped; errors back off from 1 to 30 seconds. Native arm64 and physical MOS behavior still need host verification.
+
+Full details: docs/INSTANCE-SETTINGS.md and docs/VERIFICATION.md in the source ZIP.

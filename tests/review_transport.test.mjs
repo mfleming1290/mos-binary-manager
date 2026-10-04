@@ -43,11 +43,11 @@ test('empty configuration stays empty and unknown settings survive edits', () =>
   assert.equal(current.apps[0].name, 'known fixture');
 });
 
-test('discovery never mutates or auto-adds listed executables', () => {
+test('discovery allows repeat instances but never mutates or auto-adds listed executables', () => {
   const current = config();
   current.apps.push(newApp('/tmp/one', 'one'));
   const status = { config: current, discovered: [{ name: 'one', path: '/tmp/one' }, { name: 'two', path: '/tmp/two' }] };
-  assert.deepEqual(availableDiscoveries(status), [{ name: 'two', path: '/tmp/two' }]);
+  assert.deepEqual(availableDiscoveries(status), [{ name: 'one', path: '/tmp/one' }, { name: 'two', path: '/tmp/two' }]);
   assert.equal(current.apps.length, 1);
   assert.equal(current.apps[0].autostart, false);
 });

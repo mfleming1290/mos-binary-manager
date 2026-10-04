@@ -22,3 +22,10 @@ test('Hub presentation links and settings stay aligned', () => {
   const f = fixture(); f.hub.settings = false; assert.throws(() => validateMetadata(f));
   const g = fixture(); g.hub.homepage = ''; assert.throws(() => validateMetadata(g));
 });
+test('CI covers mounted-storage simulations and root-owned protected-file fixtures explicitly', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/build-plugin.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /BINARY_MANAGER_TEST_STORAGE: \$\{\{ runner\.temp \}\}/);
+  assert.match(workflow, /BINARY_MANAGER_REQUIRE_ROOT_TEST=1/);
+  assert.match(workflow, /TestRootProtectedEnvFileEndToEnd/);
+  assert.match(workflow, /sudo env PATH=/);
+});

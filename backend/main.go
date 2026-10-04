@@ -108,39 +108,42 @@ func main() {
 	}
 	emit(out)
 }
+
+// Launch data, including protected environment values, travels only on the
+// private inherited pipe. The first byte is the durable-ownership authorization.
 func childMain() error {
-	if len(os.Args) != 3 {
+	if len(os.Args) != 2 {
 		return errors.New("invalid child invocation")
-	}
-	b, err := base64.RawURLEncoding.DecodeString(os.Args[2])
-	if err != nil {
-		return err
-	}
-	var app App
-	if err = decodeJSON(b, &app); err != nil {
-		return err
 	}
 	gate := os.NewFile(3, "launch-gate")
 	if gate == nil {
 		return errors.New("missing launch authorization pipe")
 	}
+	defer gate.Close()
 	var permit [1]byte
-	n, err := gate.Read(permit[:])
-	gate.Close()
-	if err != nil || n != 1 || permit[0] != 1 {
+	if _, err := io.ReadFull(gate, permit[:]); err != nil || permit[0] != 1 {
 		return errors.New("supervisor did not authorize launch")
 	}
-	if err = executablePath(app.Path); err != nil {
+	b, err := io.ReadAll(io.LimitReader(gate, maxLaunchJSON+1))
+	if err != nil || len(b) > maxLaunchJSON {
+		return errors.New("invalid launch data")
+	}
+	var launch launchConfig
+	if err := json.Unmarshal(b, &launch); err != nil {
+		return errors.New("invalid launch data")
+	}
+	gate.Close()
+	if err := executablePath(launch.Path); err != nil {
 		return err
 	}
-	cwd := app.Workdir
+	cwd := launch.Workdir
 	if cwd == "" {
-		cwd = filepath.Dir(app.Path)
+		cwd = filepath.Dir(launch.Path)
 	}
-	if err = os.Chdir(cwd); err != nil {
+	if err := os.Chdir(cwd); err != nil {
 		return err
 	}
-	return syscall.Exec(app.Path, append([]string{app.Path}, app.Args...), os.Environ())
+	return syscall.Exec(launch.Path, append([]string{launch.Path}, launch.Args...), launch.Env)
 }
 func openLock(path string) (*os.File, error) {
 	fd, err := syscall.Open(path, syscall.O_RDWR|syscall.O_CREAT|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
